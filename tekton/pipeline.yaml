@@ -1,0 +1,44 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: build-and-deploy
+spec:
+  workspaces:
+    - name: docker-secret
+  tasks:
+    - name: fetch-repo
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      params:
+        - name: url
+          value: https://github.com/yourusername/your-repo.git
+        - name: revision
+          value: main
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: build-image
+      taskRef:
+        name: buildah
+        kind: ClusterTask
+      runAfter: [fetch-repo]
+      params:
+        - name: IMAGE
+          value: docker.io/yourdockerhubusername/myapp:latest
+      workspaces:
+        - name: docker-config
+          workspace: docker-secret
+    - name: push-image
+      taskRef:
+        name: buildah
+        kind: ClusterTask
+      runAfter: [build-image]
+      params:
+        - name: IMAGE
+          value: docker.io/yourdockerhubusername/myapp:latest
+        - name: STORAGE
+          value: docker
+      workspaces:
+        - name: docker-config
+          workspace: docker-secret
