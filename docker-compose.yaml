@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:17.0-alpine3.20
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: Budgy  # This creates the default role.
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: myapp_production
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U Budgy -d myapp_production"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - myapp_network
+
+  web:
+    build: .
+    environment:
+      POSTGRES_USER: Budgy  # Set the new user here
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: myapp_production
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      SECRET_KEY_BASE: 5774e4284000611d4c0da06cf4e61815d57a696d63ee7a230f6e5d399a6c10867cbe744c4fd2ed52578369716c61b289c81cb1d0094e322ffe2e8c56a44da2e2
+      RAILS_ENV: production
+      RAILS_LOG_TO_STDOUT: "true"
+      RAILS_SERVE_STATIC_FILES: "true" 
+      BUNDLE_WITHOUT: "development"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app  
+      - bundle_cache:/bundle
+    networks:
+      - myapp_network
+
+  redis:
+    image: redis:7.2.5-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - myapp_network
+
+volumes:
+  postgres_data:
+  redis-data:
+  bundle_cache:
+
+networks:
+  myapp_network:
